@@ -292,15 +292,17 @@ class MainActivity : ComponentActivity() {
         return method.invoke(null, cmd, env, dir) as Process
     }
 
-    private fun shizukuCommand(command: String): String = try {
-        if (!Shizuku.pingBinder()) return "Shizuku غير متصل."
-        if (Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) return "إذن Shizuku غير ممنوح."
-        val process = shizukuNewProcess(arrayOf("sh", "-c", command), null, null)
-        val out = process.inputStream.bufferedReader().use { it.readText() }
-        val err = process.errorStream.bufferedReader().use { it.readText() }
-        val code = process.waitFor()
-        "Exit=$code\n$out\n$err".take(2500)
-    } catch (e: Exception) { "Shizuku error: ${e.message}" }
+    private fun shizukuCommand(command: String): String {
+        return try {
+            if (!Shizuku.pingBinder()) return "Shizuku غير متصل."
+            if (Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) return "إذن Shizuku غير ممنوح."
+            val process = shizukuNewProcess(arrayOf("sh", "-c", command), null, null)
+            val out = process.inputStream.bufferedReader().use { it.readText() }
+            val err = process.errorStream.bufferedReader().use { it.readText() }
+            val code = process.waitFor()
+            "Exit=$code\n$out\n$err".take(2500)
+        } catch (e: Exception) { "Shizuku error: ${e.message}" }
+    }
 
     private fun rootStatus(): String = try {
         val p = Runtime.getRuntime().exec(arrayOf("su", "-c", "id"))
