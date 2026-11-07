@@ -124,4 +124,3 @@ jobs:
           make_latest: false
           files: app/build/outputs/apk/debug/*.apk
           fail_on_unmatched_files: true
-          
