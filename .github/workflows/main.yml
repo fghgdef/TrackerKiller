@@ -11,6 +11,7 @@ on:
       - '**/*.xml'
       - 'gradle.properties'
       - '.github/workflows/build.yml'
+      - '.github/workflows/main.yml'
 
 permissions:
   contents: write
@@ -34,6 +35,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+          cache: gradle
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
@@ -43,68 +45,17 @@ jobs:
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
           yes | sdkmanager --licenses
 
-      - name: Set up Gradle 8.9
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
-
-      # Fix the Kotlin expression-body function that contains early returns.
-      # Kotlin does not allow return statements inside an expression-body function.
-      - name: Apply Kotlin compile fix
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          path = Path('app/src/main/java/com/trackerkiller/MainActivity.kt')
-          if not path.exists():
-              raise SystemExit('ERROR: MainActivity.kt was not found. Run this workflow from the Android project root.')
-
-          source = path.read_text(encoding='utf-8')
-          start_marker = '    private fun shizukuCommand(command: String)'
-          end_marker = '    private fun rootStatus()'
-          start = source.find(start_marker)
-          end = source.find(end_marker, start + len(start_marker)) if start >= 0 else -1
-
-          replacement = r'''    private fun shizukuCommand(command: String): String {
-          return try {
-              if (!Shizuku.pingBinder()) {
-                  "Shizuku غير متصل."
-              } else if (Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
-                  "إذن Shizuku غير ممنوح."
-              } else {
-                  @Suppress("DEPRECATION")
-                  val process = Shizuku.newProcess(arrayOf("sh", "-c", command), null, null)
-                  val out = process.inputStream.bufferedReader().use { it.readText() }
-                  val err = process.errorStream.bufferedReader().use { it.readText() }
-                  val code = process.waitFor()
-                  "Exit=$code\n$out\n$err".take(2500)
-              }
-          } catch (e: Exception) {
-              "Shizuku error: ${e.message}"
-          }
-      }
-
-      '''
-
-          if start < 0 or end < 0:
-              if 'private fun shizukuCommand(command: String): String {' in source:
-                  print('Kotlin fix already present; no change needed.')
-              else:
-                  raise SystemExit('ERROR: Could not locate shizukuCommand() in MainActivity.kt.')
-          else:
-              path.write_text(source[:start] + replacement + source[end:], encoding='utf-8')
-              print('Fixed shizukuCommand(): early returns are now inside a block-body function.')
-          PY
+      - name: Grant Gradle wrapper permission
+        run: chmod +x ./gradlew
 
       - name: Clean project
-        run: gradle clean --no-daemon --stacktrace
+        run: ./gradlew clean --no-daemon --stacktrace
 
       - name: Compile Kotlin
-        run: gradle :app:compileDebugKotlin --no-daemon --stacktrace
+        run: ./gradlew :app:compileDebugKotlin --no-daemon --stacktrace
 
       - name: Build Debug APK
-        run: gradle :app:assembleDebug --no-daemon --stacktrace
+        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
